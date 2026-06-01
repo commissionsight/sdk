@@ -1,6 +1,6 @@
 {
   "name": "@commissionsight/sdk",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Lightweight, zero-dependency TypeScript client for the CommissionSight API.",
   "keywords": [
     "commissionsight",
