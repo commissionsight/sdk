@@ -1,0 +1,55 @@
+{
+  "name": "@commissionsight/sdk",
+  "version": "1.2.0",
+  "description": "Lightweight, zero-dependency TypeScript client for the CommissionSight API.",
+  "keywords": [
+    "commissionsight",
+    "commission",
+    "insurance",
+    "carrier",
+    "api-client",
+    "sdk",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "CommissionSight",
+  "homepage": "https://github.com/commissionsight/sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/commissionsight/sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/commissionsight/sdk/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepublishOnly": "bun run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
