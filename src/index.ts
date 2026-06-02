@@ -148,6 +148,81 @@ export interface AdminLogs {
   pagination?: { limit: number; offset: number; hasMore: boolean };
 }
 
+/** Per-account admin dashboard: counts + the latest period's summed rollup. */
+export interface AdminAccountOverview {
+  account: { id: string; name: string; slug: string; status: string };
+  counts: { files: number; jobs: number; users: number };
+  latestPeriod: string | null;
+  rollup: {
+    memberCount: number;
+    green: number;
+    yellow: number;
+    red: number;
+    new: number;
+    reappeared: number;
+    attritionRate: number;
+    commissionAtRisk: number;
+    commissionOwed: number;
+    chargebackCount: number;
+    chargebackAmount: number;
+  } | null;
+}
+
+export interface AdminAccountFile {
+  id: string;
+  carrierId: string;
+  periodYear: number;
+  periodMonth: number;
+  originalFilename: string;
+  byteSize: number;
+  uploadedAt: number | string;
+  supersededAt: number | string | null;
+  r2PurgedAt: number | string | null;
+}
+
+export interface AdminAccountJob {
+  id: string;
+  carrierId: string;
+  periodYear: number;
+  periodMonth: number;
+  status: string;
+  error: string | null;
+  stats: Record<string, number> | null;
+  createdAt: number | string;
+  completedAt: number | string | null;
+}
+
+export interface AdminAccountUser {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: number | string;
+}
+
+/** One scheduled-maintenance (cron) pass — admin System tab. */
+export interface AdminCronRun {
+  id: string;
+  ranAt: number;
+  requeued: number;
+  webhooksRedelivered: number;
+  filesPurged: number;
+  jobsCanceled: number;
+  billed: number;
+  durationMs: number;
+}
+
+export interface AdminCronTask {
+  key: string;
+  title: string;
+  description: string;
+}
+
+export interface AdminSystemActivity {
+  generatedAt: number;
+  tasks: AdminCronTask[];
+  runs: AdminCronRun[];
+}
+
 export interface AdminProvisionResult {
   provisioned: boolean;
   alreadyProvisioned?: boolean;
@@ -728,6 +803,23 @@ export class CommissionSightClient {
       ),
     getAccountBilling: (accountId: string) =>
       this.request<AdminAccountBilling>(`/admin/accounts/${accountId}/billing`),
+    /** Per-account dashboard: counts + latest-period rollup (members, status mix,
+     * owed, at-risk, chargebacks). */
+    accountOverview: (accountId: string) =>
+      this.request<AdminAccountOverview>(`/admin/accounts/${accountId}/overview`),
+    accountFiles: (accountId: string, params: { limit?: number; offset?: number } = {}) =>
+      this.request<{ data: AdminAccountFile[] }>(
+        `/admin/accounts/${accountId}/files${query(params)}`,
+      ),
+    accountJobs: (accountId: string, params: { limit?: number; offset?: number } = {}) =>
+      this.request<{ data: AdminAccountJob[] }>(
+        `/admin/accounts/${accountId}/jobs${query(params)}`,
+      ),
+    accountUsers: (accountId: string) =>
+      this.request<{ data: AdminAccountUser[] }>(`/admin/accounts/${accountId}/users`),
+    /** Recent scheduled-maintenance (cron) runs + the task schedule — System tab. */
+    cronRuns: (params: { limit?: number } = {}) =>
+      this.request<AdminSystemActivity>(`/admin/system/cron-runs${query(params)}`),
     setSurcharge: (accountId: string, enabled: boolean) =>
       this.request<{ accountId: string; surchargeEnabled: boolean }>(
         `/admin/accounts/${accountId}/surcharge`,
