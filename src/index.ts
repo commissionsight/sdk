@@ -259,6 +259,8 @@ export interface AttritionPoint {
   red: number;
   memberCount: number;
   attritionRate: number;
+  /** Commission at risk this period (MoM shortfall), in dollars. */
+  commissionAtRisk: number;
 }
 
 export interface AssistantAnswer {
@@ -465,6 +467,14 @@ export class CommissionSightClient {
         red: number;
         new: number;
         reappeared: number;
+        /** Commission at risk vs the prior period (MoM shortfall), in dollars. */
+        commissionAtRisk: number;
+        /** Of `commissionAtRisk`: prior commission of dropped members. */
+        commissionDropped: number;
+        /** Of `commissionAtRisk`: the decrease for members paid less. */
+        commissionReduced: number;
+        /** Number of still-present members paid less than the prior period. */
+        reducedCount: number;
       };
       byCarrier: unknown[];
     }>(`/reports/rollup${query({ period, carrierId })}`);
