@@ -137,6 +137,9 @@ export interface ResultRow {
   flags: Flag[];
   commissionAmount: number | null;
   prevCommissionAmount: number | null;
+  /** Expected-vs-actual shortfall for this member (recoverable), in dollars. 0
+   * when no contracted rate applies. Reconciles to the period's owed rollup. */
+  commissionOwed: number;
   comparedAgainstPeriod: string | null;
   memberExternalId: string | null;
   memberName: string | null;
@@ -263,6 +266,12 @@ export interface AttritionPoint {
   commissionAtRisk: number;
 }
 
+export interface Webhook {
+  id: string;
+  url: string;
+  events: string[];
+}
+
 export interface ExpectedCommissionRate {
   id: string;
   carrierId: string;
@@ -363,8 +372,41 @@ export class CommissionSightClient {
       `/carriers${query({ withConfig: params.withConfig ? 'true' : undefined })}`,
     );
   }
+  getCarrier(carrierId: string) {
+    return this.request<{ id: string; name: string; slug: string }>(`/carriers/${carrierId}`);
+  }
   listConfigs(carrierId: string) {
     return this.request<Page<unknown>>(`/carriers/${carrierId}/configs`);
+  }
+  getConfigVersion(carrierId: string, version: number) {
+    return this.request<unknown>(`/carriers/${carrierId}/configs/${version}`);
+  }
+  /** Create an account-scoped carrier config override. */
+  createConfig(carrierId: string, config: unknown) {
+    return this.request<{ id: string; version: number }>(`/carriers/${carrierId}/configs`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+  /** Dry-run a config against a sample file (maps + previews, persists nothing). */
+  testConfig(carrierId: string, config: unknown, file: File | Blob) {
+    const form = new FormData();
+    form.set('config', JSON.stringify(config));
+    form.set('file', file);
+    return this.request<{ mapped: number; failed: number; rows: unknown[] }>(
+      `/carriers/${carrierId}/configs/test`,
+      { method: 'POST', body: form },
+    );
+  }
+  /** Infer a draft config from a sample file. */
+  inferConfig(carrierId: string, file: File | Blob, opts: { sheetName?: string } = {}) {
+    const form = new FormData();
+    form.set('file', file);
+    if (opts.sheetName) form.set('sheetName', opts.sheetName);
+    return this.request<InferredConfig>(`/carriers/${carrierId}/configs/infer`, {
+      method: 'POST',
+      body: form,
+    });
   }
 
   // --- files ---
@@ -396,6 +438,9 @@ export class CommissionSightClient {
   listFiles(params: { carrierId?: string; limit?: number; cursor?: number } = {}) {
     return this.request<Page<FileSummary>>(`/files${query(params)}`);
   }
+  getFile(fileId: string) {
+    return this.request<FileSummary>(`/files/${fileId}`);
+  }
   /**
    * Re-process (re-score) a file's period without re-uploading — recomputes
    * statuses/deltas against the current baseline. Use after uploading an earlier
@@ -421,7 +466,16 @@ export class CommissionSightClient {
   }
 
   // --- jobs ---
-  listJobs(params: { status?: string; carrierId?: string; limit?: number; offset?: number } = {}) {
+  listJobs(
+    params: {
+      status?: string;
+      carrierId?: string;
+      periodYear?: number;
+      periodMonth?: number;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) {
     return this.request<Page<JobSummary>>(`/jobs${query(params)}`);
   }
   getJob(jobId: string) {
@@ -447,8 +501,15 @@ export class CommissionSightClient {
   ) {
     return this.request<Page<unknown>>(`/members${query(params)}`);
   }
+  getMember(memberRefId: string) {
+    return this.request<unknown>(`/members/${memberRefId}`);
+  }
   getMemberTimeline(memberRefId: string) {
     return this.request<Page<unknown>>(`/members/${memberRefId}/timeline`);
+  }
+  /** Where/when a member was last seen (period + originating file). */
+  getMemberLastSeen(memberRefId: string) {
+    return this.request<unknown>(`/members/${memberRefId}/last-seen`);
   }
 
   // --- comparisons / reports ---
@@ -528,6 +589,31 @@ export class CommissionSightClient {
   }
   deleteExpectedRate(id: string) {
     return this.request<void>(`/expected-rates/${id}`, { method: 'DELETE' });
+  }
+
+  // --- webhooks ---
+  listWebhooks() {
+    return this.request<{ data: Webhook[] }>('/webhooks');
+  }
+  /** Subscribe to job events. The signing `secret` is returned ONCE on creation. */
+  createWebhook(input: { url: string; events: ('job.completed' | 'job.failed')[] }) {
+    return this.request<Webhook & { secret: string }>('/webhooks', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+  deleteWebhook(id: string) {
+    return this.request<void>(`/webhooks/${id}`, { method: 'DELETE' });
+  }
+
+  // --- session / service ---
+  /** The account behind the current token. */
+  me() {
+    return this.request<{ accountId: string; name: string; status: string }>('/me');
+  }
+  /** Liveness probe (no auth required). */
+  health() {
+    return this.request<{ status: string; service: string; environment: string }>('/health');
   }
 
   // --- billing / profile ---
