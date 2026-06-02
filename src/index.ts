@@ -225,6 +225,44 @@ export interface AdminSystemActivity {
   runs: AdminCronRun[];
 }
 
+/** Platform billing/revenue summary (admin). Amounts are in cents. */
+export interface AdminRevenueSummary {
+  generatedAt: number;
+  platform: {
+    accounts: { total: number; active: number; pending: number; suspended: number };
+    users: number;
+    apiKeys: number;
+    carriers: number;
+    /** Distinct monitored members across the platform (latest period per account+carrier). */
+    heartbeats: number;
+  };
+  revenue: {
+    /** Current member counts × the real pricing tiers (projected monthly revenue). */
+    projectedMonthlyCents: number;
+    avgCostPerMemberCents: number;
+    /** Sum of each account's most recent invoice total. */
+    lastCycleBilledCents: number;
+    accountsWithPaymentMethod: number;
+    byPaymentType: Record<
+      'card' | 'us_bank_account' | 'none',
+      { accounts: number; projectedCents: number; lastBilledCents: number }
+    >;
+  };
+  /** Actual A/R from Stripe, or `{ configured: false }` when Stripe isn't set up. */
+  ar:
+    | {
+        configured: true;
+        invoices: number;
+        billedCents: number;
+        paidCents: number;
+        outstandingCents: number;
+        failedCents: number;
+        recentOnly: boolean;
+      }
+    | { configured: false };
+  carriers: { carrierId: string; name: string; accounts: number; heartbeats: number }[];
+}
+
 export interface AdminProvisionResult {
   provisioned: boolean;
   alreadyProvisioned?: boolean;
@@ -915,6 +953,8 @@ export class CommissionSightClient {
     /** Recent scheduled-maintenance (cron) runs + the task schedule — System tab. */
     cronRuns: (params: { limit?: number } = {}) =>
       this.request<AdminSystemActivity>(`/admin/system/cron-runs${query(params)}`),
+    /** Platform billing/revenue summary — heartbeats, projected revenue, A/R. */
+    revenue: () => this.request<AdminRevenueSummary>('/admin/revenue'),
     setSurcharge: (accountId: string, enabled: boolean) =>
       this.request<{ accountId: string; surchargeEnabled: boolean }>(
         `/admin/accounts/${accountId}/surcharge`,
