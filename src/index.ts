@@ -57,6 +57,8 @@ export interface JobSummary {
   stats?: Record<string, number> | null;
   error?: string | null;
   webhookUrl?: string | null;
+  /** Number of rows rejected on ingest; download the detail via `downloadExceptions`. */
+  exceptionRowCount?: number;
   // Timestamps serialize as ISO strings over JSON; format via `new Date(...)`.
   createdAt: number | string;
   startedAt?: number | string | null;
@@ -445,6 +447,29 @@ export class CommissionSightClient {
     return body as T;
   }
 
+  /** Like `request` but returns the raw response body as text (e.g. a CSV
+   * download). Errors still surface as `ApiError` from the problem+json body. */
+  private async requestText(path: string, init: RequestInit = {}): Promise<string> {
+    const headers = new Headers(init.headers);
+    if (this.token) headers.set('authorization', `Bearer ${this.token}`);
+    const res = await this.fetchFn(`${this.baseUrl}${path}`, { ...init, headers });
+    const text = await res.text();
+    if (!res.ok) {
+      let body: unknown = null;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        // non-JSON error body — fall back to the status text
+      }
+      const message =
+        body && typeof body === 'object' && 'title' in body
+          ? String((body as { title: unknown }).title)
+          : res.statusText;
+      throw new ApiError(res.status, message, body);
+    }
+    return text;
+  }
+
   // --- auth ---
   register(email: string, accountName: string) {
     return this.request<{ accountId: string }>('/auth/register', {
@@ -589,6 +614,11 @@ export class CommissionSightClient {
   }
   getJob(jobId: string) {
     return this.request<JobSummary>(`/jobs/${jobId}`);
+  }
+  /** Download the exception file (rejected rows + their errors) for a job as CSV
+   * text. Retained for 30 days; a purged or absent file throws `ApiError` (404). */
+  downloadExceptions(jobId: string) {
+    return this.requestText(`/jobs/${jobId}/exceptions`);
   }
   getJobResults(
     jobId: string,
