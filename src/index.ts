@@ -293,6 +293,25 @@ export interface ResultRow {
   premiumAmount: number | null;
 }
 
+/** An account team member. */
+export interface TeamMember {
+  id: string;
+  email: string;
+  role: 'member' | 'admin';
+  createdAt: number | string;
+}
+
+/** One audit-trail event. `action` is a dotted verb (e.g. `file.upload`). */
+export interface AuditEvent {
+  id: string;
+  actor: string;
+  action: string;
+  target: string | null;
+  meta: Record<string, unknown> | null;
+  ip: string | null;
+  createdAt: number | string;
+}
+
 /** One policy line within a journey period. */
 export interface JourneyPolicy {
   policyRefId: string;
@@ -766,6 +785,29 @@ export class CommissionSightClient {
     return this.request<unknown>(`/members/${memberRefId}/last-seen`);
   }
 
+  // --- team ---
+  /** List the account's members. */
+  listTeam() {
+    return this.request<{ data: TeamMember[] }>('/team');
+  }
+  /** Invite a teammate by email (passwordless — they sign in with a one-time code). */
+  inviteTeammate(email: string) {
+    return this.request<{ status: string; email: string; userId?: string }>('/team/invites', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+  /** Remove a teammate and revoke their sessions. */
+  removeTeammate(userId: string) {
+    return this.request<void>(`/team/${userId}`, { method: 'DELETE' });
+  }
+
+  // --- audit ---
+  /** Read the account's audit trail (newest first). Filter by `action`. */
+  listAudit(params: { action?: string; limit?: number; offset?: number } = {}) {
+    return this.request<Page<AuditEvent>>(`/audit${query(params)}`);
+  }
+
   // --- comparisons / reports ---
   compare(params: { from: string; to: string; carrierId?: string; granularity?: string }) {
     return this.request<{
@@ -955,6 +997,12 @@ export class CommissionSightClient {
       this.request<AdminSystemActivity>(`/admin/system/cron-runs${query(params)}`),
     /** Platform billing/revenue summary — heartbeats, projected revenue, A/R. */
     revenue: () => this.request<AdminRevenueSummary>('/admin/revenue'),
+    /** Set an account's AI-assistant monthly cap (cents) and pass-through billing. */
+    setAiSettings: (accountId: string, settings: { capCents?: number; passthrough?: boolean }) =>
+      this.request<{ accountId: string; capCents?: number; passthrough?: boolean }>(
+        `/admin/accounts/${accountId}/ai-settings`,
+        { method: 'PUT', body: JSON.stringify(settings) },
+      ),
     setSurcharge: (accountId: string, enabled: boolean) =>
       this.request<{ accountId: string; surchargeEnabled: boolean }>(
         `/admin/accounts/${accountId}/surcharge`,
