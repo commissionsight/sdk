@@ -10,7 +10,29 @@ export type Flag =
   | 'DATA_CHANGED'
   | 'DROPPED'
   | 'REAPPEARED'
-  | 'REAPPEARED_WITH_DELTA';
+  | 'REAPPEARED_WITH_DELTA'
+  | 'CHARGEBACK';
+
+/** One chargeback (negative-commission record) enriched with the original payout. */
+export interface ChargebackRow {
+  memberRefId: string;
+  memberExternalId: string | null;
+  policyNumber: string | null;
+  planName: string | null;
+  /** The amount clawed back this period (positive magnitude). */
+  chargebackAmount: number;
+  /** Whether the carrier ever paid this policy out. */
+  paidOut: boolean;
+  /** The original payout ("record 0"): when/where the carrier first paid, and how much. */
+  originalPayout: {
+    period: string;
+    amount: number;
+    fileId: string | null;
+    fileName: string | null;
+  } | null;
+  /** Whether the chargeback exactly reverses the original payout. */
+  fullyReversed: boolean;
+}
 
 export interface ClientOptions {
   baseUrl: string;
@@ -494,11 +516,21 @@ export class CommissionSightClient {
   }
   getJobResults(
     jobId: string,
-    params: { status?: string; owedOnly?: boolean; limit?: number; offset?: number } = {},
+    params: {
+      status?: string;
+      owedOnly?: boolean;
+      chargeback?: boolean;
+      limit?: number;
+      offset?: number;
+    } = {},
   ) {
-    const { owedOnly, ...rest } = params;
+    const { owedOnly, chargeback, ...rest } = params;
     return this.request<Page<ResultRow> & { period: { year: number; month: number } }>(
-      `/jobs/${jobId}/results${query({ ...rest, owedOnly: owedOnly ? 'true' : undefined })}`,
+      `/jobs/${jobId}/results${query({
+        ...rest,
+        owedOnly: owedOnly ? 'true' : undefined,
+        chargeback: chargeback ? 'true' : undefined,
+      })}`,
     );
   }
   getJobDeltas(jobId: string, params: { memberRefId?: string; changeType?: string } = {}) {
@@ -567,9 +599,21 @@ export class CommissionSightClient {
         owedEvaluated: number;
         /** All records considered for owed (coverage denominator). */
         owedTotal: number;
+        /** Members with a chargeback (net-negative commission) this period. */
+        chargebackCount: number;
+        /** Total commission clawed back this period (positive magnitude). */
+        chargebackAmount: number;
       };
       byCarrier: unknown[];
     }>(`/reports/rollup${query({ period, carrierId })}`);
+  }
+  /** Chargebacks for a period, each enriched with the policy's original payout. */
+  listChargebacks(
+    params: { period?: string; carrierId?: string; limit?: number; offset?: number } = {},
+  ) {
+    return this.request<{ period: string | null; data: ChargebackRow[] } & Page<ChargebackRow>>(
+      `/chargebacks${query(params)}`,
+    );
   }
   attrition(period: string, carrierId?: string) {
     return this.request<{ attritionRate: number; byCarrier: unknown[] }>(
