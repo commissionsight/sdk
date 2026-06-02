@@ -234,7 +234,11 @@ export interface AdminProvisionResult {
 }
 
 export interface ResultRow {
+  /** Internal CommissionSight member id — stable across periods; use it to pull
+   * the member's full journey (`getMemberJourney`). Included on every export. */
   memberRefId: string;
+  /** Internal CommissionSight policy id (member-scoped). `getPolicyJourney`. */
+  policyRefId: string | null;
   status: Status;
   flags: Flag[];
   commissionAmount: number | null;
@@ -249,6 +253,52 @@ export interface ResultRow {
   planName: string | null;
   policyNumber: string | null;
   premiumAmount: number | null;
+}
+
+/** One policy line within a journey period. */
+export interface JourneyPolicy {
+  policyRefId: string;
+  policyNumber: string | null;
+  planName: string | null;
+  planCode: string | null;
+  commissionAmount: number;
+  premiumAmount: number | null;
+  effectiveDate: string | null;
+  renewalDate: string | null;
+}
+export interface JourneyDelta {
+  field: string;
+  prevValue: string | null;
+  currValue: string | null;
+}
+/** One period in a member/policy audit journey. */
+export interface JourneyPeriod {
+  period: string;
+  periodYear: number;
+  periodMonth: number;
+  status: Status | null;
+  flags: Flag[];
+  commissionAmount: number;
+  premiumAmount: number | null;
+  policies: JourneyPolicy[];
+  file: { fileId: string; fileName: string | null; uploadedAt: number | null } | null;
+  deltas: JourneyDelta[];
+  firstSeen: boolean;
+}
+/** The full audit history of a member (or a single policy). */
+export interface Journey {
+  memberRefId: string;
+  policyRefId?: string;
+  member: {
+    memberExternalId: string | null;
+    memberName: string | null;
+    email: string | null;
+    carrierId: string;
+  };
+  firstPeriod: string | null;
+  latestPeriod: string | null;
+  periodCount: number;
+  periods: JourneyPeriod[];
 }
 
 export interface ComparisonRow {
@@ -659,6 +709,15 @@ export class CommissionSightClient {
   }
   getMemberTimeline(memberRefId: string) {
     return this.request<Page<unknown>>(`/members/${memberRefId}/timeline`);
+  }
+  /** Full audit journey of a member: every period it appeared, the source file,
+   * commission/premium, status + flags, and field-level changes — in order. */
+  getMemberJourney(memberRefId: string) {
+    return this.request<Journey>(`/members/${memberRefId}/journey`);
+  }
+  /** Full audit journey of a single policy (member-scoped). */
+  getPolicyJourney(policyRefId: string) {
+    return this.request<Journey>(`/policies/${policyRefId}/journey`);
   }
   /** Where/when a member was last seen (period + originating file). */
   getMemberLastSeen(memberRefId: string) {
