@@ -363,13 +363,21 @@ export class CommissionSightClient {
     periodMonth: number;
     webhookUrl?: string;
     idempotencyKey?: string;
-  }): Promise<{ jobId: string; fileId: string; status: string }> {
+    /**
+     * Replace an existing statement for this carrier+period. Without it, uploading
+     * over an existing period fails with `409` (`period_exists`); with it, the
+     * existing data is retracted and the corrected file re-ingested atomically
+     * (dropped members leave no orphan rows). The response carries `mode:'replace'`.
+     */
+    replace?: boolean;
+  }): Promise<{ jobId: string; fileId: string; status: string; mode?: string }> {
     const form = new FormData();
     form.set('file', input.file);
     form.set('carrierId', input.carrierId);
     form.set('periodYear', String(input.periodYear));
     form.set('periodMonth', String(input.periodMonth));
     if (input.webhookUrl) form.set('webhookUrl', input.webhookUrl);
+    if (input.replace) form.set('replace', 'true');
     const headers = input.idempotencyKey ? { 'idempotency-key': input.idempotencyKey } : undefined;
     return this.request('/files', { method: 'POST', body: form, headers });
   }
@@ -385,6 +393,18 @@ export class CommissionSightClient {
     return this.request<{ jobId: string; fileId: string; status: string; mode: string }>(
       `/files/${fileId}/rescore`,
       { method: 'POST' },
+    );
+  }
+  /**
+   * Retract (unapply) a file's carrier+period — deletes the period's data with no
+   * re-upload and re-scores the following month. Scoped to the whole carrier+period
+   * (all files for it), so a period split across files clears as a unit. Returns
+   * `409` (`already_retracted`) if the file was already retracted/replaced.
+   */
+  retractFile(fileId: string) {
+    return this.request<{ jobId: string; fileId: string; status: string; mode: string }>(
+      `/files/${fileId}`,
+      { method: 'DELETE' },
     );
   }
 

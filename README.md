@@ -133,6 +133,25 @@ for (const f of files.data) {
 }
 ```
 
+### Correcting or removing a statement
+
+Uploading over a carrier+period that already has a file fails with `409` (`period_exists`) — re-uploads are never silently destructive. To apply a **corrected file**, pass `replace: true`: the existing data is retracted and the corrected file re-ingested atomically, so members the correction drops leave no orphan rows. The following month is re-scored automatically.
+
+```ts
+// Carrier sent a corrected April file — replace the one on record.
+const { jobId, mode } = await cs.uploadFile({
+  file: correctedFile,
+  carrierId: 'car_123',
+  periodYear: 2026,
+  periodMonth: 4,
+  replace: true, // omit → 409 period_exists if the period already exists
+});
+// mode === 'replace'
+
+// Or remove a period entirely (no re-upload), re-scoring the next month:
+await cs.retractFile(fileId);
+```
+
 ---
 
 ## Status & flags
