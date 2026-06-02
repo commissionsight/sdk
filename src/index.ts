@@ -278,7 +278,11 @@ export interface JourneyPeriod {
   periodMonth: number;
   status: Status | null;
   flags: Flag[];
-  commissionAmount: number;
+  /** True when present on this period's statement; false for a drop-off period
+   * (red, absent from the file). */
+  present: boolean;
+  commissionAmount: number | null;
+  prevCommissionAmount: number | null;
   premiumAmount: number | null;
   policies: JourneyPolicy[];
   file: { fileId: string; fileName: string | null; uploadedAt: number | null } | null;
