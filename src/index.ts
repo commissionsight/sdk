@@ -56,6 +56,8 @@ export interface FileSummary {
    * it without re-uploading.
    */
   rescoreSuggested?: boolean;
+  /** When set, the raw bytes were purged from object storage (retention). */
+  r2PurgedAt?: number | string | null;
 }
 
 export interface AdminMetrics {
@@ -464,6 +466,15 @@ export class CommissionSightClient {
       { method: 'DELETE' },
     );
   }
+  /**
+   * Purge the raw statement bytes from object storage (data retention). The file
+   * row + scored results remain; the file can no longer be re-ingested. Idempotent.
+   */
+  purgeFile(fileId: string) {
+    return this.request<{ fileId: string; purged: boolean }>(`/files/${fileId}/purge`, {
+      method: 'POST',
+    });
+  }
 
   // --- jobs ---
   listJobs(
@@ -696,6 +707,12 @@ export class CommissionSightClient {
         method: 'POST',
         body: JSON.stringify({ name }),
       }),
+    /** Purge ALL raw statement bytes for an account from object storage (retention). */
+    purgeAccountFiles: (accountId: string) =>
+      this.request<{ accountId: string; purged: number }>(
+        `/admin/accounts/${accountId}/purge-files`,
+        { method: 'POST' },
+      ),
     issueToken: (accountId: string, label?: string) =>
       this.request<{ tokenId: string; token: string; label: string }>(
         `/admin/accounts/${accountId}/tokens`,
