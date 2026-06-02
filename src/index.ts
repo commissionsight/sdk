@@ -16,6 +16,7 @@ export type Flag =
 /** One chargeback (negative-commission record) enriched with the original payout. */
 export interface ChargebackRow {
   memberRefId: string;
+  policyRefId: string;
   memberExternalId: string | null;
   policyNumber: string | null;
   planName: string | null;
