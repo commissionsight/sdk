@@ -710,14 +710,16 @@ export class CommissionSightClient {
     );
   }
   /** Upsert the contracted rate for a carrier (+ optional plan). Re-posting the
-   * same carrier+plan updates it. `rateValue` is a fraction for percent_of_premium. */
+   * same carrier+plan updates it. `rateValue` is a fraction for percent_of_premium.
+   * Returns `rescoredPeriods`: how many already-processed periods were re-scored to
+   * bring their stored "commission owed" totals in line with the new rate. */
   upsertExpectedRate(input: {
     carrierId: string;
     planCode?: string | null;
     rateType: 'percent_of_premium' | 'flat_per_member';
     rateValue: number;
   }) {
-    return this.request<ExpectedCommissionRate>('/expected-rates', {
+    return this.request<ExpectedCommissionRate & { rescoredPeriods: number }>('/expected-rates', {
       method: 'POST',
       body: JSON.stringify(input),
     });
