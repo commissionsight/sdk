@@ -481,9 +481,13 @@ export class CommissionSightClient {
   getJob(jobId: string) {
     return this.request<JobSummary>(`/jobs/${jobId}`);
   }
-  getJobResults(jobId: string, params: { status?: string; limit?: number; offset?: number } = {}) {
+  getJobResults(
+    jobId: string,
+    params: { status?: string; owedOnly?: boolean; limit?: number; offset?: number } = {},
+  ) {
+    const { owedOnly, ...rest } = params;
     return this.request<Page<ResultRow> & { period: { year: number; month: number } }>(
-      `/jobs/${jobId}/results${query(params)}`,
+      `/jobs/${jobId}/results${query({ ...rest, owedOnly: owedOnly ? 'true' : undefined })}`,
     );
   }
   getJobDeltas(jobId: string, params: { memberRefId?: string; changeType?: string } = {}) {
