@@ -263,6 +263,16 @@ export interface AttritionPoint {
   commissionAtRisk: number;
 }
 
+export interface ExpectedCommissionRate {
+  id: string;
+  carrierId: string;
+  /** null = the carrier-wide default; a value = a per-plan override. */
+  planCode: string | null;
+  rateType: 'percent_of_premium' | 'flat_per_member';
+  /** Fraction for percent_of_premium (0.20 = 20%); dollars for flat_per_member. */
+  rateValue: number;
+}
+
 export interface AssistantAnswer {
   question: string;
   answer: string;
@@ -475,6 +485,12 @@ export class CommissionSightClient {
         commissionReduced: number;
         /** Number of still-present members paid less than the prior period. */
         reducedCount: number;
+        /** Expected-vs-actual commission owed (recoverable), in dollars. */
+        commissionOwed: number;
+        /** Records the owed figure could be computed for (had a rate + inputs). */
+        owedEvaluated: number;
+        /** All records considered for owed (coverage denominator). */
+        owedTotal: number;
       };
       byCarrier: unknown[];
     }>(`/reports/rollup${query({ period, carrierId })}`);
@@ -489,6 +505,29 @@ export class CommissionSightClient {
   }
   dataQuality(period?: string) {
     return this.request<DataQualityReport>(`/reports/data-quality${query({ period })}`);
+  }
+
+  // --- expected commission rates (the "owed" model inputs) ---
+  listExpectedRates(carrierId?: string) {
+    return this.request<{ data: ExpectedCommissionRate[] }>(
+      `/expected-rates${query({ carrierId })}`,
+    );
+  }
+  /** Upsert the contracted rate for a carrier (+ optional plan). Re-posting the
+   * same carrier+plan updates it. `rateValue` is a fraction for percent_of_premium. */
+  upsertExpectedRate(input: {
+    carrierId: string;
+    planCode?: string | null;
+    rateType: 'percent_of_premium' | 'flat_per_member';
+    rateValue: number;
+  }) {
+    return this.request<ExpectedCommissionRate>('/expected-rates', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+  deleteExpectedRate(id: string) {
+    return this.request<void>(`/expected-rates/${id}`, { method: 'DELETE' });
   }
 
   // --- billing / profile ---
