@@ -63,29 +63,17 @@ cs.setToken(undefined); // clear it
 
 ## Authentication
 
-Two kinds of credentials reach the API:
-
-- **API tokens** — long-lived, per-account, issued by an admin. Best for server-to-server integrations. Pass as `token`.
-- **Session tokens** — short-lived, obtained by a user via a one-time passcode (OTP) emailed to them. Used by the web app, but available here too.
-
-### OTP login flow
+The SDK is for **server-to-server integrations**, authenticated with a **per-account API token**
+issued to you by CommissionSight. Pass it as `token` when constructing the client (or set/rotate it
+later); every request is sent as `Authorization: Bearer <token>`.
 
 ```ts
-const cs = new CommissionSightClient({ baseUrl: 'https://api.commissionsight.com/v1' });
+const cs = new CommissionSightClient({
+  baseUrl: 'https://api.commissionsight.com/v1',
+  token: process.env.COMMISSIONSIGHT_TOKEN, // your per-account API token
+});
 
-// 1. Register a new account (creates a PENDING account — an admin must approve it).
-await cs.register('ops@acme.com', 'Acme Insurance');
-
-// 2. Request a one-time code (emailed to the address).
-await cs.requestOtp('ops@acme.com');
-
-// 3. Verify the code → receive a session token.
-const { token, account, role } = await cs.verifyOtp('ops@acme.com', '123456');
-cs.setToken(token);
-
-if (account?.status !== 'active') {
-  // The account is registered but not yet approved for access.
-}
+cs.setToken(newToken); // rotate at any time
 ```
 
 ---
@@ -189,13 +177,49 @@ await cs.getJobResults(jobId, { status: 'red', limit: 100, offset: 0 });
 await cs.getJobDeltas(jobId, { changeType: 'COMMISSION_CHANGED' });
 await cs.retryJob(jobId);
 
-// Members & their history across periods
+// Members & policies — status, timeline, and the full audit journey
 await cs.listMembers({ carrierId, status: 'yellow' });
 await cs.getMemberTimeline(memberRefId);
+await cs.getMemberJourney(memberRefId); // every period, source file, status + field changes
+await cs.getPolicyJourney(policyRefId);
+
+// Rejected rows from an ingest (exception file, as CSV text)
+const csv = await cs.downloadExceptions(jobId);
 
 // Carriers & their mapping configs
 await cs.listCarriers({ withConfig: true });
 await cs.listConfigs(carrierId);
+```
+
+### Commission owed (expected vs. actual)
+
+Set your contracted rate per carrier; the API computes the recoverable shortfall vs. what the
+carrier actually paid (it's also a per-member field on the results grid).
+
+```ts
+await cs.upsertExpectedRate({ carrierId, rateType: 'percent_of_premium', rateValue: 0.2 });
+const rollup = await cs.rollup('2026-05', carrierId);
+console.log(rollup.totals.commissionOwed, rollup.totals.owedEvaluated, rollup.totals.owedTotal);
+```
+
+### Chargebacks
+
+```ts
+const cb = await cs.listChargebacks({ carrierId }); // negative-commission events + original payout
+```
+
+### Webhooks
+
+Subscribe to signed callbacks instead of polling:
+
+```ts
+await cs.createWebhook({ url: 'https://acme.com/hooks/cs', events: ['job.completed'] });
+```
+
+### Audit trail
+
+```ts
+await cs.listAudit({ limit: 50 }); // append-only record of account actions
 ```
 
 ### Compare any two periods
@@ -226,22 +250,6 @@ console.log(res.answer); // prose answer
 console.log(res.sql);    // the SQL that was run (read-only)
 console.log(res.rows);   // the underlying result rows
 ```
-
----
-
-## Admin namespace
-
-Admin operations live under `cs.admin.*` and require a session whose role is `admin`. These manage accounts, tokens, carriers/configs, users, and platform metrics.
-
-```ts
-await cs.admin.listAccounts('pending');
-await cs.admin.approveAccount(accountId);    // approves + provisions the data store
-await cs.admin.issueToken(accountId, 'production');
-await cs.admin.inferConfig(carrierId, sampleFile); // draft a carrier mapping from a sample
-await cs.admin.metrics();
-```
-
-See [`src/index.ts`](./src/index.ts) for the full admin surface.
 
 ---
 
@@ -287,13 +295,14 @@ try {
 
 ## TypeScript
 
-Every payload is exported as a named type — `ResultRow`, `ComparisonRow`, `JobSummary`, `FileSummary`, `BillingProfile`, `DataQualityReport`, `AttritionPoint`, `AssistantAnswer`, the `admin` shapes, and the `Status` / `Flag` unions. Import what you need:
+Every payload is exported as a named type — `ResultRow`, `ComparisonRow`, `JobSummary`, `FileSummary`, `Journey`, `ChargebackRow`, `ExpectedCommissionRate`, `AuditEvent`, `DataQualityReport`, `AttritionPoint`, and the `Status` / `Flag` unions. Import what you need:
 
 ```ts
 import type {
   CommissionSightClient,
   ResultRow,
   JobSummary,
+  Journey,
   Status,
   Flag,
 } from '@commissionsight/sdk';
