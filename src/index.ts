@@ -502,6 +502,8 @@ export interface AssistantAnswer {
   columns: string[];
   rows: Record<string, unknown>[];
   truncated: boolean;
+  /** Context-aware follow-up questions suggested from this answer + its data. */
+  followUps?: string[];
 }
 
 export class ApiError extends Error {
