@@ -572,27 +572,6 @@ export class CommissionSightClient {
     return text;
   }
 
-  // --- auth ---
-  register(email: string, accountName: string) {
-    return this.request<{ accountId: string }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, accountName }),
-    });
-  }
-  requestOtp(email: string) {
-    return this.request<{ status: string }>('/auth/otp/request', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  }
-  verifyOtp(email: string, code: string) {
-    return this.request<{
-      token: string;
-      account: { accountId: string; status: string } | null;
-      role: string;
-    }>('/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, code }) });
-  }
-
   // --- carriers / configs ---
   listCarriers(params: { withConfig?: boolean } = {}) {
     return this.request<Page<{ id: string; name: string; slug: string }>>(
