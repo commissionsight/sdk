@@ -240,19 +240,6 @@ await cs.dataQuality('2026-05');                 // statement-quality signals (o
 
 ---
 
-## AI assistant
-
-Ask natural-language questions against your data. The API translates the question to read-only SQL, runs it, and returns both the answer and the rows.
-
-```ts
-const res = await cs.ask('Which members had the biggest commission drop last month?');
-console.log(res.answer); // prose answer
-console.log(res.sql);    // the SQL that was run (read-only)
-console.log(res.rows);   // the underlying result rows
-```
-
----
-
 ## Pagination
 
 List endpoints return a `Page<T>`:

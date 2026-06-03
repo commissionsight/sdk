@@ -495,17 +495,6 @@ export interface ExpectedCommissionRate {
   rateValue: number;
 }
 
-export interface AssistantAnswer {
-  question: string;
-  answer: string;
-  sql: string;
-  columns: string[];
-  rows: Record<string, unknown>[];
-  truncated: boolean;
-  /** Context-aware follow-up questions suggested from this answer + its data. */
-  followUps?: string[];
-}
-
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -950,14 +939,6 @@ export class CommissionSightClient {
       '/billing/payment-method',
       { method: 'POST', body: JSON.stringify({ paymentMethodId }) },
     );
-  }
-
-  // --- AI assistant ---
-  ask(question: string, history: { question: string; sql?: string }[] = []) {
-    return this.request<AssistantAnswer>('/assistant/query', {
-      method: 'POST',
-      body: JSON.stringify({ question, history }),
-    });
   }
 
   // --- admin (role=admin session required) ---
