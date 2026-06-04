@@ -630,6 +630,12 @@ export class CommissionSightClient {
      * (dropped members leave no orphan rows). The response carries `mode:'replace'`.
      */
     replace?: boolean;
+    /**
+     * Target workspace. Required when the account has the multi-workspace feature
+     * enabled (uploads must specify which workspace they belong to); omit for
+     * single-workspace accounts.
+     */
+    workspaceId?: string;
   }): Promise<{ jobId: string; fileId: string; status: string; mode?: string }> {
     const form = new FormData();
     form.set('file', input.file);
@@ -638,6 +644,7 @@ export class CommissionSightClient {
     form.set('periodMonth', String(input.periodMonth));
     if (input.webhookUrl) form.set('webhookUrl', input.webhookUrl);
     if (input.replace) form.set('replace', 'true');
+    if (input.workspaceId) form.set('workspaceId', input.workspaceId);
     const headers = input.idempotencyKey ? { 'idempotency-key': input.idempotencyKey } : undefined;
     return this.request('/files', { method: 'POST', body: form, headers });
   }
