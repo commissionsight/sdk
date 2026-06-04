@@ -898,6 +898,18 @@ export class CommissionSightClient {
   me() {
     return this.request<{ accountId: string; name: string; status: string }>('/me');
   }
+  /**
+   * The account's workspaces. When `enabled` is true the account uses multiple
+   * workspaces and uploads must target one (pass `workspaceId` to `uploadFile`,
+   * and `?workspaceId` to reports to scope to a single workspace's slice);
+   * otherwise the account has just its single default workspace.
+   */
+  listWorkspaces() {
+    return this.request<{
+      enabled: boolean;
+      workspaces: { id: string; name: string; isDefault: boolean }[];
+    }>('/workspaces');
+  }
   /** Liveness probe (no auth required). */
   health() {
     return this.request<{ status: string; service: string; environment: string }>('/health');
