@@ -786,7 +786,15 @@ export class CommissionSightClient {
   }
 
   // --- comparisons / reports ---
-  compare(params: { from: string; to: string; carrierId?: string; granularity?: string }) {
+  // Reports accept an optional `workspaceId` to scope to a single workspace's
+  // slice (only meaningful when the account has multiple workspaces enabled).
+  compare(params: {
+    from: string;
+    to: string;
+    carrierId?: string;
+    workspaceId?: string;
+    granularity?: string;
+  }) {
     return this.request<{
       from: string;
       to: string;
@@ -801,7 +809,7 @@ export class CommissionSightClient {
       data: ComparisonRow[];
     }>(`/comparisons${query(params)}`);
   }
-  rollup(period?: string, carrierId?: string) {
+  rollup(period?: string, carrierId?: string, workspaceId?: string) {
     return this.request<{
       period: string | null;
       totals: {
@@ -831,26 +839,34 @@ export class CommissionSightClient {
         chargebackAmount: number;
       };
       byCarrier: unknown[];
-    }>(`/reports/rollup${query({ period, carrierId })}`);
+    }>(`/reports/rollup${query({ period, carrierId, workspaceId })}`);
   }
   /** Chargebacks for a period, each enriched with the policy's original payout. */
   listChargebacks(
-    params: { period?: string; carrierId?: string; limit?: number; offset?: number } = {},
+    params: {
+      period?: string;
+      carrierId?: string;
+      workspaceId?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
   ) {
     return this.request<{ period: string | null; data: ChargebackRow[] } & Page<ChargebackRow>>(
       `/chargebacks${query(params)}`,
     );
   }
-  attrition(period: string, carrierId?: string) {
+  attrition(period: string, carrierId?: string, workspaceId?: string) {
     return this.request<{ attritionRate: number; byCarrier: unknown[] }>(
-      `/reports/attrition${query({ period, carrierId })}`,
+      `/reports/attrition${query({ period, carrierId, workspaceId })}`,
     );
   }
-  attritionSeries(params: { months?: number; carrierId?: string } = {}) {
+  attritionSeries(params: { months?: number; carrierId?: string; workspaceId?: string } = {}) {
     return this.request<{ data: AttritionPoint[] }>(`/reports/attrition-series${query(params)}`);
   }
-  dataQuality(period?: string) {
-    return this.request<DataQualityReport>(`/reports/data-quality${query({ period })}`);
+  dataQuality(period?: string, workspaceId?: string) {
+    return this.request<DataQualityReport>(
+      `/reports/data-quality${query({ period, workspaceId })}`,
+    );
   }
 
   // --- expected commission rates (the "owed" model inputs) ---
