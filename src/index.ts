@@ -926,6 +926,17 @@ export class CommissionSightClient {
       workspaces: { id: string; name: string; isDefault: boolean }[];
     }>('/workspaces');
   }
+  /**
+   * Create an additional workspace (requires the multi-workspace feature on the
+   * account; returns `403 feature_not_enabled` otherwise). The new workspace is
+   * non-default; pass its id as `workspaceId` to `uploadFile` and reports.
+   */
+  createWorkspace(name: string) {
+    return this.request<{ id: string; name: string; isDefault: boolean }>('/workspaces', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
   /** Liveness probe (no auth required). */
   health() {
     return this.request<{ status: string; service: string; environment: string }>('/health');
