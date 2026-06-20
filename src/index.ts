@@ -479,6 +479,75 @@ export interface AttritionPoint {
   commissionAtRisk: number;
 }
 
+/** One period's row in a cumulative report (summed across carriers/workspaces). */
+export interface CumulativePeriod {
+  period: string;
+  year: number;
+  month: number;
+  memberCount: number;
+  red: number;
+  new: number;
+  reappeared: number;
+  commissionAtRisk: number;
+  commissionOwed: number;
+  owedEvaluated: number;
+  owedTotal: number;
+  /** owedEvaluated ÷ owedTotal for the period (0 when nothing was evaluable). */
+  owedCoverage: number;
+  chargebackCount: number;
+  chargebackAmount: number;
+}
+
+/** One carrier's cumulative totals over the range. */
+export interface CumulativeCarrier {
+  carrierId: string;
+  carrierName: string | null;
+  commissionOwed: number;
+  commissionAtRisk: number;
+  chargebackAmount: number;
+  owedEvaluated: number;
+  owedTotal: number;
+  owedCoverage: number;
+  /** Sum of per-period member counts (a volume — NOT distinct members). */
+  memberMonths: number;
+  periodsCovered: number;
+}
+
+/** Cumulative audit report over a period range (`GET /reports/cumulative`). */
+export interface CumulativeReport {
+  range: {
+    /** Earliest/latest period that actually had data in the range. */
+    from: string | null;
+    to: string | null;
+    /** The from/to you asked for (null when omitted). */
+    requestedFrom: string | null;
+    requestedTo: string | null;
+    periodsCovered: number;
+  };
+  totals: {
+    /** Σ expected-vs-actual commission owed (recoverable) over the range. */
+    commissionOwed: number;
+    commissionAtRisk: number;
+    chargebackAmount: number;
+    chargebackCount: number;
+    red: number;
+    new: number;
+    reappeared: number;
+    owedEvaluated: number;
+    owedTotal: number;
+    /** Cumulative owed coverage: Σ evaluated ÷ Σ total. */
+    owedCoverage: number;
+    /** Member-MONTHS (Σ per-period counts) — a volume, NOT distinct members. */
+    memberMonths: number;
+    avgMembers: number;
+    peakMembers: number;
+    /** True if any owed-contributing carrier is still on an auto-seeded estimate rate. */
+    owedEstimated: boolean;
+  };
+  byPeriod: CumulativePeriod[];
+  byCarrier: CumulativeCarrier[];
+}
+
 export interface Webhook {
   id: string;
   url: string;
@@ -862,6 +931,17 @@ export class CommissionSightClient {
   }
   attritionSeries(params: { months?: number; carrierId?: string; workspaceId?: string } = {}) {
     return this.request<{ data: AttritionPoint[] }>(`/reports/attrition-series${query(params)}`);
+  }
+  /**
+   * Cumulative audit totals over a period range — summed commission owed /
+   * at-risk / chargebacks (+ counts) with per-period and per-carrier breakdowns,
+   * plus cumulative owed coverage. `from`/`to` (YYYY-MM) are inclusive and both
+   * optional (omit → all periods). The figures an agency takes to a carrier audit.
+   */
+  cumulative(
+    params: { from?: string; to?: string; carrierId?: string; workspaceId?: string } = {},
+  ) {
+    return this.request<CumulativeReport>(`/reports/cumulative${query(params)}`);
   }
   dataQuality(period?: string, workspaceId?: string) {
     return this.request<DataQualityReport>(
