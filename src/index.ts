@@ -586,6 +586,34 @@ export interface InferredConfig {
   preview: { mapped: number; failed: number; rows: unknown[] } | null;
 }
 
+/** A carrier brand (e.g. "UHC") and its per-product member carriers. */
+export interface CarrierGroup {
+  id: string;
+  name: string;
+  slug: string;
+  members: { id: string; name: string; slug: string }[];
+}
+
+/** One scored carrier candidate from `resolveCarrier`. */
+export interface CarrierResolveCandidate {
+  carrierId: string;
+  name: string | null;
+  slug: string | null;
+  productLine: 'major_medical' | 'medicare' | 'ancillary';
+  /** 0..1 — how well this carrier's config fits the sample. */
+  confidence: number;
+  reason: string;
+}
+
+/** Result of resolving a brand + sample file to a concrete carrier. When
+ *  `ambiguous` is true the caller should make the user confirm before uploading. */
+export interface CarrierResolveResult {
+  groupId: string;
+  ambiguous: boolean;
+  best: CarrierResolveCandidate | null;
+  ranked: CarrierResolveCandidate[];
+}
+
 export class CommissionSightClient {
   private readonly baseUrl: string;
   private token: string | undefined;
@@ -643,12 +671,30 @@ export class CommissionSightClient {
 
   // --- carriers / configs ---
   listCarriers(params: { withConfig?: boolean } = {}) {
-    return this.request<Page<{ id: string; name: string; slug: string }>>(
+    return this.request<Page<{ id: string; name: string; slug: string; groupId?: string | null }>>(
       `/carriers${query({ withConfig: params.withConfig ? 'true' : undefined })}`,
     );
   }
   getCarrier(carrierId: string) {
-    return this.request<{ id: string; name: string; slug: string }>(`/carriers/${carrierId}`);
+    return this.request<{ id: string; name: string; slug: string; groupId?: string | null }>(
+      `/carriers/${carrierId}`,
+    );
+  }
+  /** Carrier brands (groups) that have at least one configured member carrier. */
+  listCarrierGroups() {
+    return this.request<Page<CarrierGroup>>('/carriers/groups');
+  }
+  /**
+   * Resolve a brand (groupId) + a sample file to the concrete carrier whose config
+   * best fits the file — the "select UHC, detect the product" step. Returns the
+   * detected carrier plus ranked alternatives; when `ambiguous`, confirm with the
+   * user, then upload to the chosen `carrierId` via `uploadFile`.
+   */
+  resolveCarrier(groupId: string, file: File | Blob) {
+    const form = new FormData();
+    form.set('groupId', groupId);
+    form.set('file', file);
+    return this.request<CarrierResolveResult>('/carriers/resolve', { method: 'POST', body: form });
   }
   listConfigs(carrierId: string) {
     return this.request<Page<unknown>>(`/carriers/${carrierId}/configs`);
